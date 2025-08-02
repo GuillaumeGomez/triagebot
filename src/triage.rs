@@ -1,6 +1,7 @@
 use crate::handlers::Context;
 use chrono::{Duration, Utc};
-use hyper::{Body, Response, StatusCode};
+use http_body_util::{combinators::BoxBody, BodyExt};
+use hyper::{Response, StatusCode};
 use serde::Serialize;
 use serde_json::value::{Value, to_value};
 use std::sync::Arc;
@@ -9,11 +10,11 @@ use url::Url;
 const YELLOW_DAYS: i64 = 7;
 const RED_DAYS: i64 = 14;
 
-pub fn index() -> Result<Response<Body>, hyper::Error> {
+pub fn index() -> Result<Response<BoxBody<bytes::Bytes, std::convert::Infallible>>, hyper::Error> {
     Ok(Response::builder()
         .header("Content-Type", "text/html")
         .status(StatusCode::OK)
-        .body(Body::from(include_str!("../templates/triage/index.html")))
+        .body(include_str!("../templates/triage/index.html").to_string().boxed())
         .unwrap())
 }
 
@@ -21,7 +22,7 @@ pub async fn pulls(
     ctx: Arc<Context>,
     owner: &str,
     repo: &str,
-) -> Result<Response<Body>, hyper::Error> {
+) -> Result<Response<BoxBody<bytes::Bytes, std::convert::Infallible>>, hyper::Error> {
     let octocrab = &ctx.octocrab;
     let res = octocrab
         .pulls(owner, repo)
@@ -36,7 +37,7 @@ pub async fn pulls(
         Err(_) => {
             return Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
-                .body(Body::from("The repository is not found."))
+                .body("The repository is not found.".to_string().boxed())
                 .unwrap());
         }
     };
@@ -107,12 +108,12 @@ pub async fn pulls(
     context.insert("repo", &repo);
 
     let tera = tera::Tera::new("templates/triage/**/*").unwrap();
-    let body = Body::from(tera.render("pulls.html", &context).unwrap());
+    let body = tera.render("pulls.html", &context).unwrap();
 
     Ok(Response::builder()
         .header("Content-Type", "text/html")
         .status(StatusCode::OK)
-        .body(body)
+        .body(body.boxed())
         .unwrap())
 }
 

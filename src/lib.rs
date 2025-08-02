@@ -140,12 +140,12 @@ pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::R
 
 pub async fn webhook(
     event: EventName,
-    payload: String,
+    payload: &str,
     ctx: &handlers::Context,
 ) -> Result<bool, WebhookError> {
     let event = match event {
         EventName::PullRequestReview => {
-            let mut payload = deserialize_payload::<github::PullRequestReviewEvent>(&payload)
+            let mut payload = deserialize_payload::<github::PullRequestReviewEvent>(payload)
                 .context("PullRequestReview failed to deserialize")
                 .map_err(anyhow::Error::from)?;
 

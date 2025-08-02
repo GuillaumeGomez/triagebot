@@ -1,8 +1,9 @@
 use crate::github::{self, WorkflowRunJob};
 use crate::handlers::Context;
 use anyhow::Context as _;
+use http_body_util::{combinators::BoxBody, BodyExt};
 use hyper::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE};
-use hyper::{Body, Response, StatusCode};
+use hyper::{Response, StatusCode};
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -68,7 +69,7 @@ pub async fn gha_logs(
     owner: &str,
     repo: &str,
     log_id: &str,
-) -> Result<Response<Body>, hyper::Error> {
+) -> Result<Response<BoxBody<bytes::Bytes, std::convert::Infallible>>, hyper::Error> {
     let res = process_logs(ctx, owner, repo, log_id).await;
     let res = match res {
         Ok(r) => r,
@@ -76,7 +77,7 @@ pub async fn gha_logs(
             tracing::error!("gha_logs: unable to serve logs for {owner}/{repo}#{log_id}: {e:?}");
             return Ok(Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::from(format!("{:?}", e)))
+                .body(format!("{:?}", e).boxed())
                 .unwrap());
         }
     };
@@ -89,7 +90,7 @@ async fn process_logs(
     owner: &str,
     repo: &str,
     log_id: &str,
-) -> anyhow::Result<Response<Body>> {
+) -> anyhow::Result<Response<BoxBody<bytes::Bytes, std::convert::Infallible>>> {
     let log_id = u128::from_str(log_id).context("log_id is not a number")?;
 
     let repos = ctx
@@ -377,45 +378,45 @@ body {{
                 "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src 'self' www.rust-lang.org"
             ),
         )
-        .body(Body::from(html))?);
+        .body(html.boxed())?);
 }
 
-pub fn ansi_up_min_js() -> anyhow::Result<Response<Body>, hyper::Error> {
+pub fn ansi_up_min_js() -> anyhow::Result<Response<BoxBody<bytes::Bytes, std::convert::Infallible>>, hyper::Error> {
     const ANSI_UP_MIN_JS: &str = include_str!("gha_logs/ansi_up@0.0.1-custom.js");
 
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
         .header(CONTENT_TYPE, "text/javascript; charset=utf-8")
-        .body(Body::from(ANSI_UP_MIN_JS))
+        .body(ANSI_UP_MIN_JS.to_string().boxed())
         .unwrap())
 }
 
-pub fn success_svg() -> anyhow::Result<Response<Body>, hyper::Error> {
+pub fn success_svg() -> anyhow::Result<Response<BoxBody<bytes::Bytes, std::convert::Infallible>>, hyper::Error> {
     const SUCCESS_SVG: &str = include_str!("gha_logs/success.svg");
 
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
         .header(CONTENT_TYPE, "image/svg+xml; charset=utf-8")
-        .body(Body::from(SUCCESS_SVG))
+        .body(SUCCESS_SVG.to_string().boxed())
         .unwrap())
 }
 
-pub fn failure_svg() -> anyhow::Result<Response<Body>, hyper::Error> {
+pub fn failure_svg() -> anyhow::Result<Response<BoxBody<bytes::Bytes, std::convert::Infallible>>, hyper::Error> {
     const FAILURE_SVG: &str = include_str!("gha_logs/failure.svg");
 
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
         .header(CONTENT_TYPE, "image/svg+xml; charset=utf-8")
-        .body(Body::from(FAILURE_SVG))
+        .body(FAILURE_SVG.to_string().boxed())
         .unwrap())
 }
 
-fn bad_request(body: String) -> Response<Body> {
+fn bad_request(body: String) -> Response<BoxBody<bytes::Bytes, std::convert::Infallible>> {
     Response::builder()
         .status(StatusCode::BAD_REQUEST)
-        .body(Body::from(body))
+        .body(body.boxed())
         .unwrap()
 }
